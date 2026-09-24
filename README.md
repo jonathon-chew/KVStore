@@ -1,102 +1,72 @@
 # KVStore
 
-An educational, in-memory key-value store built in Go. `KVStore` implements a hash table from scratch to explore the mechanics behind fast key lookup: deterministic hashing, bucket selection, collision handling, resizing, and a small CRUD-style API.
+KVStore is an in-memory key-value server written in Go. It accepts line-delimited TCP commands and stores values in a custom hash table.
 
-It is intentionally not a replacement for Go's `map`, Redis, or a database. The point is to make the underlying data structure visible and testable.
+## What it does
 
-## Features
+- Listens on TCP port `6379` on all network interfaces
+- Accepts one command per newline from each connected client
+- Supports `SET`, `GET`, and `DEL` commands
+- Stores values in memory only; restarting the server clears all data
+- Uses FNV-1a hashing and separate chaining for hash-table collisions
+- Rejects attempts to `SET` an existing key
+- Protects hash-table operations with a mutex so multiple connections can access the store
+- Doubles the bucket count and rehashes entries once the tracked load factor reaches `0.75`
 
-- String keys hashed with FNV-1a via Go's standard `hash/fnv` package
-- Average constant-time lookup through bucket indexing
-- Separate chaining for hash collisions
-- Add, get, existence check, and remove operations
-- Duplicate-key protection
-- Automatic bucket growth at a `0.75` load factor, with entries rehashed into the larger table
-- Values stored as `any`, allowing mixed value types within one running store
-- A runnable example and Go test suite
+## Requirements
 
-## Quick Start
+- Go `1.27.1`, as declared in [go.mod](./go.mod)
+- A TCP client such as `nc` (netcat) for manual interaction
 
-### Prerequisites
+## Run the server
 
-- Go `1.27.1` or a compatible Go toolchain
-
-### Run the demonstration
+From the repository root:
 
 ```bash
-cd Private/kvstore
 go run ./cmd/KVStore
 ```
 
-The demonstration adds `Example`, reads it back, removes it, then confirms it is no longer present:
+In another terminal, connect locally:
 
-```text
-Example exists: true
-Example was found with the value: Hello World
-Example exists: false
+```bash
+nc localhost 6379
 ```
 
-### Run the tests
+## Command protocol
+
+Send a single command followed by a newline. Commands are uppercase and use spaces to separate arguments.
+
+| Command | Description | Success response | Error response |
+| --- | --- | --- | --- |
+| `SET <key> <value>` | Adds a new key with a string value. | `Successfully added` | `<key> already exists` |
+| `GET <key>` | Retrieves a stored value. | The stored string value | `[ERROR]: No key for: <key>, false` |
+| `DEL <key>` | Removes a stored key. | `Successfully added` | `<key> does not exist` |
+
+For example:
+
+```text
+SET greeting Hello
+Successfully added
+GET greeting
+Hello
+DEL greeting
+Successfully added
+GET greeting
+[ERROR]: No key for: greeting, false
+```
+
+`SET` values are single tokens, so they cannot contain spaces.
+
+## Implementation notes
+
+The store lives in [internal/kvstore/KV.go](./internal/kvstore/KV.go). Each hash-table bucket is a slice of entries; entries with the same bucket index are compared by key. The server in [cmd/KVStore/main.go](./cmd/KVStore/main.go) starts a goroutine for every client connection, while [internal/commands/parse_command.go](./internal/commands/parse_command.go) translates protocol commands into store operations.
+
+## Test
 
 ```bash
 go test ./...
 ```
 
-## Core Operations
-
-The `HashTable` implementation currently lives in `cmd/KVStore/main.go` and exposes these methods within the demonstration package:
-
-| Method | Behaviour |
-| --- | --- |
-| `Add(key, value)` | Stores a new key/value pair. Returns an error when the key already exists. |
-| `Get(key)` | Returns the stored value and `true`, or `nil` and `false` when the key is absent. |
-| `Remove(key)` | Removes an existing key. Returns an error when the key is absent. |
-| `exists(key)` | Internal helper that finds the target bucket and reports whether the key exists. |
-
-## How It Works
-
-```text
-key
- |
- v
-FNV-1a hash
- |
- v
-hash % bucket count
- |
- v
-bucket [Entry, Entry, ...]
-```
-
-Each bucket is a slice of `Entry` values. When two keys resolve to the same bucket, both remain in that slice and are compared by key during lookup. This is separate chaining.
-
-The table begins with a fixed number of buckets. Once `size / bucketCount` reaches `0.75`, the table doubles its bucket count and rehashes every entry because the bucket index depends on the number of buckets.
-
-## Project Structure
-
-```text
-cmd/KVStore/
-  main.go          hash table implementation and runnable example
-  main_test.go     insertion and duplicate-key test coverage
-internal/cli/
-  cli.go           reserved for a future command-line interface
-scripts/           development and CI helper scripts
-```
-
-## Current Status
-
-The project is a learning implementation and runs entirely in memory. Data is not persisted, the hash table is not yet packaged for import by other Go programs, and the current executable uses a fixed example rather than accepting user input.
-
-The existing tests cover successful insertion and duplicate-key rejection. Lookup, deletion, collision, and resize behaviour remain good candidates for assertion-based tests.
-
-## Roadmap
-
-- Extract the hash table into an importable package
-- Add a constructor so callers do not initialise buckets directly
-- Expand test coverage for lookup, removal, collisions, and resizing
-- Add an interactive CLI in `internal/cli`
-- Consider persistence and a small network API only after the in-memory API is stable
-
 ## License
 
-See [LICENSE](./LICENSE) for details.
+KVStore is released under the [MIT License](./LICENSE).
