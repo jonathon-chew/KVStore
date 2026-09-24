@@ -3,6 +3,7 @@ package kvstore
 import (
 	"fmt"
 	"hash/fnv"
+	"sync"
 )
 
 type Entry struct {
@@ -13,6 +14,7 @@ type Entry struct {
 type HashTable struct {
 	Buckets [][]Entry
 	Size    int
+	mu      sync.RWMutex
 }
 
 func hashString(key string) uint32 {
@@ -22,6 +24,8 @@ func hashString(key string) uint32 {
 }
 
 func (m *HashTable) Add(key string, value any) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	bucket_number, exists := m.exists(key)
 	if exists {
 		return fmt.Errorf("%s already exists", key)
@@ -44,6 +48,8 @@ func (m *HashTable) Add(key string, value any) error {
 }
 
 func (m *HashTable) Remove(key string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	bucket_number, exists := m.exists(key)
 	if !exists {
@@ -84,6 +90,9 @@ func (m *HashTable) exists(key string) (uint32, bool) {
 }
 
 func (m *HashTable) Get(key string) (any, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	bucket_number := m.bucketFor(key)
 	bucket := m.Buckets[bucket_number]
 

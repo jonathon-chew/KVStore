@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/jonathon-chew/KVStore/internal/commands"
 	"github.com/jonathon-chew/KVStore/internal/kvstore"
-	"github.com/jonathon-chew/KVStore/internal/parse_command"
 )
 
 func handleConnection(conn net.Conn, kv *kvstore.HashTable) {
@@ -17,10 +17,18 @@ func handleConnection(conn net.Conn, kv *kvstore.HashTable) {
 	scanner := bufio.NewScanner(conn)
 
 	for scanner.Scan() {
-		command := scanner.Text()
-		fmt.Printf("Recieved: %s\n", command)
+		request := scanner.Text()
+		fmt.Printf("Recieved: %s\n", request)
 
-		parse_command.ParseCommand()
+		response, err := commands.ParseCommand(request, kv)
+		if err != nil {
+			fmt.Println(err.Error())
+			conn.Write([]byte(err.Error() + "\n"))
+		}
+
+		if r, ok := response.(string); ok {
+			conn.Write([]byte(r + "\n"))
+		}
 	}
 
 	if err := scanner.Err(); err != nil {
