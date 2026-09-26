@@ -67,6 +67,28 @@ The store lives in [internal/kvstore/KV.go](./internal/kvstore/KV.go). Each hash
 go test ./...
 ```
 
+## Roadmap
+[x] HashMap
+[x] Resize
+[x] Thread safety
+[x] TCP
+[x] Protocol separation
+[x] SET
+[x] GET
+[x] DEL
+[x] GETDEL
+[x] INCR
+[x] STRLEN
+
+[ ] RESP             ← NEXT
+[ ] CLI
+[ ] Pipelining
+[ ] TTL + expiry heap
+[ ] AOF/WAL
+[ ] Snapshots
+[ ] Metrics
+[ ] Benchmarks/load testing
+
 ## License
 
 KVStore is released under the [MIT License](./LICENSE).
