@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"net"
 
 	"github.com/jonathon-chew/KVStore/internal/commands"
@@ -14,25 +15,24 @@ func handleConnection(conn net.Conn, kv *kvstore.HashTable) {
 
 	fmt.Println("Client connected:", conn.RemoteAddr())
 
-	scanner := bufio.NewScanner(conn)
+	reader := bufio.NewReader(conn)
 
-	for scanner.Scan() {
-		request := scanner.Text()
-		fmt.Printf("Recieved: %s\n", request)
-
-		response, err := commands.ParseCommand(request, kv)
+	for {
+		command, err := commands.ReadCommand(*reader)
 		if err != nil {
-			fmt.Println(err.Error())
-			conn.Write([]byte(err.Error() + "\n"))
+			if err == io.EOF {
+				break
+			}
+			fmt.Println("Protocol error:", err)
+			break
 		}
-
-		if r, ok := response.(string); ok {
-			conn.Write([]byte(r + "\n"))
+		fmt.Printf("Command: %s Args: %v", command.Name, command.Args)
+		_, parseErr := commands.ParseCommand(command.Name, command.Args, kv)
+		if parseErr != nil {
+			conn.Write([]byte("-" + parseErr.Error() + "\r\n"))
+			continue
 		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		fmt.Println("Read error:", err)
+		conn.Write([]byte("+OK\r\n"))
 	}
 }
 
@@ -44,9 +44,7 @@ func main() {
 	if err != nil {
 		fmt.Printf("[ERROR]: %s\n", err.Error())
 	}
-
 	defer listener.Close()
-
 	for {
 		conn, err := listener.Accept()
 		if err != nil {

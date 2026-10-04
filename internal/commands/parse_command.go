@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"bufio"
 	"fmt"
 	"strconv"
 	"strings"
@@ -8,29 +9,96 @@ import (
 	"github.com/jonathon-chew/KVStore/internal/kvstore"
 )
 
+type Command struct {
+	Name string
+	Args []string
+}
+
 func check_len_min(check string, minimum_length int) bool {
 	return len(check) >= minimum_length
 }
 
-func ParseCommand(request string, kv *kvstore.HashTable) (any, error) {
-
-	var command, key, value string
-
-	split_string := strings.Split(request, " ")
-	fmt.Println(split_string)
-
-	if len(split_string) >= 2 {
-		return nil, fmt.Errorf("[ERROR]: not enough commands, minimum 2\n")
+func ReadCommand(reader bufio.Reader) (Command, error) {
+	prefix, err := reader.ReadByte()
+	if err != nil {
+		return Command{}, err
 	}
 
-	command = split_string[0]
-	key = split_string[1]
-
-	if len(split_string) == 3 {
-		value = split_string[2]
+	if prefix != '*' {
+		return Command{}, fmt.Errorf("expected array, got %q", prefix)
 	}
 
-	switch strings.Split(command, " ")[0] {
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		return Command{}, err
+	}
+
+	line = strings.Replace(line, "\r\n", "", 1)
+
+	count, err := strconv.Atoi(line)
+	if err != nil {
+		return Command{}, fmt.Errorf("invalid array length: %w", err)
+	}
+
+	if count == 0 {
+		return Command{}, fmt.Errorf("empty command")
+	}
+
+	parts := make([]string, count)
+
+	for i := 0; i < count; i++ {
+		prefix, err := reader.ReadByte()
+		if err != nil {
+			return Command{}, nil
+		}
+
+		if prefix != '$' {
+			return Command{}, fmt.Errorf("expected bulk string, got %q",
+				prefix)
+		}
+
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return Command{}, err
+		}
+
+		line = strings.Replace(line, "\r\n", "", 1)
+
+		length, err := strconv.Atoi(line)
+		if err != nil {
+			return Command{}, err
+		}
+
+		data := make([]byte, length)
+
+		if _, err := reader.Read(data); err != nil {
+			return Command{}, err
+		}
+
+		parts[i] = string(data)
+	}
+
+	return Command{
+		Name: parts[0],
+		Args: parts[1:],
+	}, nil
+}
+
+func ParseCommand(command string, args []string, kv *kvstore.HashTable) (any, error) {
+
+	var key, value string
+
+	if len(args) == 0 {
+		return nil, fmt.Errorf("[ERROR]: No key found in args %v", args)
+	}
+
+	key = args[0]
+
+	if len(args) > 1 {
+		value = args[1]
+	}
+
+	switch command {
 	case "SET":
 		fmt.Println("User would like to set a key")
 		if !check_len_min(key, 1) || !check_len_min(value, 1) {
