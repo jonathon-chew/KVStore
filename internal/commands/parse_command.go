@@ -134,7 +134,7 @@ func ParseCommand(command string, args []string, kv *kvstore.HashTable) (any, er
 		kv.Remove(key)
 		return value, nil
 	case "GETSET":
-		fmt.Println("User would like to get a key and delete it")
+		fmt.Println("User would like to get a key and replace it")
 		return_value, err := kv.Get(key)
 		if !err {
 			return nil, fmt.Errorf("[ERROR]: No key for: %s, %v", key, err)
@@ -160,13 +160,18 @@ func ParseCommand(command string, args []string, kv *kvstore.HashTable) (any, er
 			return len(value), nil
 		}
 		return nil, fmt.Errorf("[ERROR]: Unable to get the str length of %s as it's value %s is not a string\n", key, return_value)
-	case "INCR":
+	case "INCR", "INCRBY":
 		fmt.Println("User would like to incriment a value, or set it's value to 0")
 		return_value, exists := kv.Get(key)
+		if command != "INCRBY" {
+			value = "0"
+		}
 		if !exists {
-			if err := kv.Add(key, 0); err != nil {
+			if err := kv.Add(key, value); err != nil {
 				return nil, fmt.Errorf("[ERROR]: key not found and unable to set to 0\n")
 			}
+			fmt.Println("Added the key and initalised to 0")
+			return nil, nil
 		}
 
 		switch v := return_value.(type) {
