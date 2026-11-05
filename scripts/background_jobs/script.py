@@ -16,8 +16,8 @@ print(r.get("name"))
 # INCR
 print(r.incr("counter"))
 
-# GET
-print(r.get("counter"))
+# GETSET
+print(r.getset("counter", "4"))
 
 # STRLEN
 print(r.strlen("name"))
