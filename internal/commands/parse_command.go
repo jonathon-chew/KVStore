@@ -3,6 +3,7 @@ package commands
 import (
 	"bufio"
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -18,7 +19,7 @@ func check_len_min(check string, minimum_length int) bool {
 	return len(check) >= minimum_length
 }
 
-func ReadCommand(reader bufio.Reader) (Command, error) {
+func ReadCommand(reader *bufio.Reader) (Command, error) {
 	prefix, err := reader.ReadByte()
 	if err != nil {
 		return Command{}, err
@@ -33,15 +34,13 @@ func ReadCommand(reader bufio.Reader) (Command, error) {
 		return Command{}, err
 	}
 
-	line = strings.Replace(line, "\r\n", "", 1)
-
-	count, err := strconv.Atoi(line)
+	count, err := strconv.Atoi(strings.TrimSuffix(line, "\r\n"))
 	if err != nil {
 		return Command{}, fmt.Errorf("invalid array length: %w", err)
 	}
 
-	if count == 0 {
-		return Command{}, fmt.Errorf("empty command")
+	if count < 1 {
+		return Command{}, fmt.Errorf("invalid command length")
 	}
 
 	parts := make([]string, count)
@@ -49,12 +48,11 @@ func ReadCommand(reader bufio.Reader) (Command, error) {
 	for i := 0; i < count; i++ {
 		prefix, err := reader.ReadByte()
 		if err != nil {
-			return Command{}, nil
+			return Command{}, err
 		}
 
 		if prefix != '$' {
-			return Command{}, fmt.Errorf("expected bulk string, got %q",
-				prefix)
+			return Command{}, fmt.Errorf("expected bulk string, got %q", prefix)
 		}
 
 		line, err := reader.ReadString('\n')
@@ -62,17 +60,29 @@ func ReadCommand(reader bufio.Reader) (Command, error) {
 			return Command{}, err
 		}
 
-		line = strings.Replace(line, "\r\n", "", 1)
-
-		length, err := strconv.Atoi(line)
+		length, err := strconv.Atoi(strings.TrimSuffix(line, "\r\n"))
 		if err != nil {
 			return Command{}, err
 		}
 
+		if length < 0 {
+			return Command{}, fmt.Errorf("invalid bulk string length")
+		}
+
 		data := make([]byte, length)
 
-		if _, err := reader.Read(data); err != nil {
+		if _, err := io.ReadFull(reader, data); err != nil {
 			return Command{}, err
+		}
+
+		// Consume trailing CRLF
+		terminator := make([]byte, 2)
+		if _, err := io.ReadFull(reader, terminator); err != nil {
+			return Command{}, err
+		}
+
+		if string(terminator) != "\r\n" {
+			return Command{}, fmt.Errorf("invalid bulk string terminator")
 		}
 
 		parts[i] = string(data)

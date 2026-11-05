@@ -18,7 +18,7 @@ func handleConnection(conn net.Conn, kv *kvstore.HashTable) {
 	reader := bufio.NewReader(conn)
 
 	for {
-		command, err := commands.ReadCommand(*reader)
+		command, err := commands.ReadCommand(reader)
 		if err != nil {
 			if err == io.EOF {
 				break
@@ -26,7 +26,7 @@ func handleConnection(conn net.Conn, kv *kvstore.HashTable) {
 			fmt.Println("Protocol error:", err)
 			break
 		}
-		fmt.Printf("Command: %s Args: %v", command.Name, command.Args)
+		fmt.Printf("Command: /%s/ Args: /%v/\n", command.Name, command.Args)
 		_, parseErr := commands.ParseCommand(command.Name, command.Args, kv)
 		if parseErr != nil {
 			conn.Write([]byte("-" + parseErr.Error() + "\r\n"))
@@ -37,6 +37,9 @@ func handleConnection(conn net.Conn, kv *kvstore.HashTable) {
 }
 
 func main() {
+
+	fmt.Println("Up and running...")
+
 	var kv kvstore.HashTable
 	kv.Buckets = make([][]kvstore.Entry, 10)
 
