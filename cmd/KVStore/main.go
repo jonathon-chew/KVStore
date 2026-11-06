@@ -27,12 +27,18 @@ func handleConnection(conn net.Conn, kv *kvstore.HashTable) {
 			break
 		}
 		fmt.Printf("Command: /%s/ Args: /%v/\n", command.Name, command.Args)
-		_, parseErr := commands.ParseCommand(command.Name, command.Args, kv)
+		rv, parseErr := commands.ParseCommand(command.Name, command.Args, kv)
 		if parseErr != nil {
 			conn.Write([]byte("-" + parseErr.Error() + "\r\n"))
 			continue
 		}
-		conn.Write([]byte("+OK\r\n"))
+
+		if rv != nil {
+			conn.Write([]byte(fmt.Sprintf("+%v\r\n", rv)))
+		} else {
+			conn.Write([]byte("+Ok\r\n"))
+		}
+
 	}
 }
 

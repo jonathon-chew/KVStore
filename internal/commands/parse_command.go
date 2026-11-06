@@ -163,11 +163,20 @@ func ParseCommand(command string, args []string, kv *kvstore.HashTable) (any, er
 	case "INCR", "INCRBY":
 		fmt.Println("User would like to incriment a value, or set it's value to 0")
 		return_value, exists := kv.Get(key)
-		if command != "INCRBY" {
-			value = "0"
+
+		var incr_value int
+		var err error
+		if command == "INCRBY" {
+			incr_value, err = strconv.Atoi(value)
+			if err != nil {
+				return nil, fmt.Errorf("[ERROR]: unable to incriment %s by %s\n", key, value)
+			}
+		} else {
+			incr_value, _ = strconv.Atoi("0")
 		}
+
 		if !exists {
-			if err := kv.Add(key, value); err != nil {
+			if err := kv.Add(key, incr_value); err != nil {
 				return nil, fmt.Errorf("[ERROR]: key not found and unable to set to 0\n")
 			}
 			fmt.Println("Added the key and initalised to 0")
@@ -176,7 +185,7 @@ func ParseCommand(command string, args []string, kv *kvstore.HashTable) (any, er
 
 		switch v := return_value.(type) {
 		case int:
-			if err := kv.Add(key, v+1); err != nil {
+			if err := kv.Add(key, v+incr_value); err != nil {
 				return nil, fmt.Errorf("[ERROR]: Unable to incriment key\n")
 			}
 		case string:
@@ -187,9 +196,9 @@ func ParseCommand(command string, args []string, kv *kvstore.HashTable) (any, er
 			if remove_err := kv.Remove(key); remove_err != nil {
 				return nil, fmt.Errorf("[ERROR]: Unable to remove key to re-add it with it's new value!, %s\n", v)
 			}
-			key_add_err := kv.Add(key, number)
+			key_add_err := kv.Add(key, number+incr_value)
 			if key_add_err != nil {
-				if err := kv.Add(key, value); err != nil {
+				if err := kv.Add(key, number); err != nil {
 					return nil, fmt.Errorf("[ERROR]: Failed to add the new value, old one was removed and could not be added back\n")
 				}
 				return nil, fmt.Errorf("[ERROR]: Unable to incriment key\n")
