@@ -8,22 +8,22 @@ r = redis.Redis(
 )
 
 # SET
-print(r.set("name", "Jon"))
+print("SET: ", r.set("name", "Jon"))
 
 # GET
-print(r.get("name"))
+print("GET: ", r.get("name"))
 
 # INCR
-print(r.incr("counter"))
+print("INCR: ", r.incr("counter"))
 
 # GETSET
-print(r.getset("counter", "4"))
+print("GETSET: ", r.getset("counter", "4"))
 
 # STRLEN
-print(r.strlen("name"))
+print("STRLEN: ", r.strlen("name"))
 
 # GETDEL
-print(r.getdel("name"))
+print("GETDEL: ", r.getdel("name"))
 
 # DELETE
-print(r.delete("counter"))
+print("DELETE: ", r.delete("counter"))
