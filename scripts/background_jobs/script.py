@@ -8,22 +8,45 @@ r = redis.Redis(
 )
 
 # SET
-print("SET: ", r.set("name", "Jon"))
+try:
+	print("SET: ", r.set("name", "Jon"))
+except Exception as e:
+	print("[ERROR]: ", e)
 
 # GET
-print("GET: ", r.get("name"))
+try:
+	print("GET: ", r.get("name"))
+except Exception as e:
+	print("[ERROR]: ", e)
 
 # INCR
-print("INCR: ", r.incr("counter"))
+try:
+	# print("GET: ", r.get("counter"))
+	print("INCR: ", r.incr("counter"))
+except Exception as e:
+	print("[ERROR]: ", e)
 
 # GETSET
-print("GETSET: ", r.getset("counter", "4"))
+try:
+	print("GETSET: ", r.getset("name", "Not Jon"))
+except Exception as e:
+	print("[ERROR]: ", e)
 
 # STRLEN
-print("STRLEN: ", r.strlen("name"))
+try:
+	print("STRLEN: ", r.strlen("name"))
+except Exception as e:
+	print("[ERROR]: ", e)
 
 # GETDEL
-print("GETDEL: ", r.getdel("name"))
+try:
+	print("GETDEL: ", r.getdel("name"))
+except Exception as e:
+	print("[ERROR]: ", e)
 
 # DELETE
-print("DELETE: ", r.delete("counter"))
+try:
+	print("SET: ", r.set("delete_me", "True"))
+	print("DELETE: ", r.delete("delete_me"))
+except Exception as e:
+	print("[ERROR]: ", e)

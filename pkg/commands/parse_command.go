@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/jonathon-chew/KVStore/internal/kvstore"
+	"github.com/jonathon-chew/KVStore/pkg/kvstore"
 )
 
 type Command struct {
@@ -15,6 +15,9 @@ type Command struct {
 	Args []string
 }
 
+/*
+Check the length of the string is at least the length of the number put in
+*/
 func check_len_min(check string, minimum_length int) bool {
 	return len(check) >= minimum_length
 }
@@ -135,21 +138,28 @@ func ParseCommand(command string, args []string, kv *kvstore.HashTable) (any, er
 		return value, nil
 	case "GETSET":
 		fmt.Println("User would like to get a key and replace it")
-		return_value, err := kv.Get(key)
-		if !err {
-			return nil, fmt.Errorf("[ERROR]: No key for: %s, %v", key, err)
-		}
+
 		if !check_len_min(key, 1) || !check_len_min(value, 1) {
 			return nil, fmt.Errorf("[ERROR]: not enough commands to SET, minimum 3\n")
 		}
-		kv.Add(key, value)
+
+		return_value, exists := kv.Get(key)
+		if !exists {
+			return nil, fmt.Errorf("[ERROR]: unable to get a value for %s as it does not exist\n", key)
+		}
+
+		update_err := kv.Update(key, value)
+		if update_err != nil {
+			return nil, fmt.Errorf("[ERROR]: unable to update: %s to %v\n", key, value)
+		}
+
 		return return_value, nil
 	case "DEL":
 		fmt.Println("User would like to del a key")
 		if err := kv.Remove(key); err != nil {
 			return nil, err
 		}
-		return "Successfully added", nil
+		return "Successfully deleted", nil
 	case "STRLEN":
 		return_value, exists := kv.Get(key)
 		if !exists {
@@ -163,6 +173,13 @@ func ParseCommand(command string, args []string, kv *kvstore.HashTable) (any, er
 	case "INCR", "INCRBY":
 		fmt.Println("User would like to incriment a value, or set it's value to 0")
 		return_value, exists := kv.Get(key)
+		if !exists {
+			if err := kv.Add(key, 0); err != nil {
+				return nil, fmt.Errorf("[ERROR]: key not found and unable to set to 0\n")
+			}
+			// fmt.Println("Added the key and initalised to 0")
+			return "Added the key and initalised to 0", nil
+		}
 
 		var incr_value int
 		var err error
@@ -171,23 +188,15 @@ func ParseCommand(command string, args []string, kv *kvstore.HashTable) (any, er
 			if err != nil {
 				return nil, fmt.Errorf("[ERROR]: unable to incriment %s by %s\n", key, value)
 			}
-		} else {
-			incr_value, _ = strconv.Atoi("0")
-		}
-
-		if !exists {
-			if err := kv.Add(key, incr_value); err != nil {
-				return nil, fmt.Errorf("[ERROR]: key not found and unable to set to 0\n")
-			}
-			fmt.Println("Added the key and initalised to 0")
-			return nil, nil
 		}
 
 		switch v := return_value.(type) {
 		case int:
-			if err := kv.Add(key, v+incr_value); err != nil {
+			if err := kv.Update(key, v+incr_value); err != nil {
 				return nil, fmt.Errorf("[ERROR]: Unable to incriment key\n")
 			}
+
+			return nil, nil
 		case string:
 			number, err := strconv.Atoi(v)
 			if err != nil {
@@ -196,8 +205,8 @@ func ParseCommand(command string, args []string, kv *kvstore.HashTable) (any, er
 			if remove_err := kv.Remove(key); remove_err != nil {
 				return nil, fmt.Errorf("[ERROR]: Unable to remove key to re-add it with it's new value!, %s\n", v)
 			}
-			key_add_err := kv.Add(key, number+incr_value)
-			if key_add_err != nil {
+			key_update_err := kv.Update(key, number+incr_value)
+			if key_update_err != nil {
 				if err := kv.Add(key, number); err != nil {
 					return nil, fmt.Errorf("[ERROR]: Failed to add the new value, old one was removed and could not be added back\n")
 				}
@@ -207,5 +216,5 @@ func ParseCommand(command string, args []string, kv *kvstore.HashTable) (any, er
 			return nil, fmt.Errorf("[ERROR]: Value is neither string which can be converted to an int, nor an int\n")
 		}
 	}
-	return "", nil
+	return "", fmt.Errorf("Unable to parse command")
 }
