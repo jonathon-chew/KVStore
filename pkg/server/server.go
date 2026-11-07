@@ -34,7 +34,7 @@ func handleConnection(conn net.Conn, kv *kvstore.HashTable) {
 		}
 
 		if rv != nil {
-			conn.Write([]byte(fmt.Sprintf("+%v\r\n", rv)))
+			conn.Write(fmt.Appendf(nil, "+%v\r\n", rv))
 		} else {
 			conn.Write([]byte("+Ok\r\n"))
 		}
@@ -46,8 +46,7 @@ func Server() {
 
 	fmt.Println("Up and running...")
 
-	var kv kvstore.HashTable
-	kv.Buckets = make([][]kvstore.Entry, 10)
+	kv := kvstore.NewKVStore(10)
 
 	listener, err := net.Listen("tcp", ":6379")
 	if err != nil {
@@ -60,6 +59,6 @@ func Server() {
 			fmt.Printf("[ERROR]: %s\n", err.Error())
 		}
 
-		go handleConnection(conn, &kv)
+		go handleConnection(conn, kv)
 	}
 }

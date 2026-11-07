@@ -118,7 +118,7 @@ func ParseCommand(command string, args []string, kv *kvstore.HashTable) (any, er
 			return nil, fmt.Errorf("[ERROR]: not enough commands to SET, minimum 3\n")
 		}
 		if err := kv.Add(key, value); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("[ERROR]: when adding the key: %s error: %s\n", key, err.Error())
 		}
 		return "Successfully added", nil
 	case "GET":

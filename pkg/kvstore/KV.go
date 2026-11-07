@@ -13,7 +13,7 @@ type Entry struct {
 
 type HashTable struct {
 	Buckets [][]Entry
-	Size    int
+	Size    int // How many elements in a single bucket before resizing, to keep the arrays short for faster look up
 	mu      sync.RWMutex
 }
 
@@ -100,6 +100,16 @@ func (m *HashTable) Get(key string) (any, bool) {
 	}
 
 	return nil, false
+}
+
+func NewKVStore(size int) *HashTable {
+
+	var kv HashTable
+
+	kv.Buckets = make([][]Entry, size)
+	kv.Size = size
+
+	return &kv
 }
 
 func (m *HashTable) Remove(key string) error {
