@@ -1,12 +1,12 @@
 # KVStore
 
-KVStore is an in-memory key-value server written in Go. It accepts line-delimited TCP commands and stores values in a custom hash table.
+KVStore is an in-memory key-value server written in Go. It accepts Redis-style RESP commands over TCP and stores values in a custom hash table.
 
 ## What it does
 
 - Listens on TCP port `6379` on all network interfaces
-- Accepts one command per newline from each connected client
-- Supports `SET`, `GET`, and `DEL` commands
+- Accepts RESP arrays containing bulk strings from each connected client
+- Supports `SET`, `GET`, `DEL`, `GETDEL`, `INCR`, and `STRLEN`
 - Stores values in memory only; restarting the server clears all data
 - Uses FNV-1a hashing and separate chaining for hash-table collisions
 - Rejects attempts to `SET` an existing key
@@ -34,7 +34,7 @@ nc localhost 6379
 
 ## Command protocol
 
-Send a single command followed by a newline. Commands are uppercase and use spaces to separate arguments.
+Send commands using the Redis Serialization Protocol (RESP). The first array item is the uppercase command and the remaining items are its arguments.
 
 | Command | Description | Success response | Error response |
 | --- | --- | --- | --- |
@@ -45,21 +45,16 @@ Send a single command followed by a newline. Commands are uppercase and use spac
 For example:
 
 ```text
-SET greeting Hello
-Successfully added
-GET greeting
+*3\r\n$3\r\nSET\r\n$8\r\ngreeting\r\n$5\r\nHello\r\n
+*2\r\n$3\r\nGET\r\n$8\r\ngreeting\r\n
 Hello
-DEL greeting
-Successfully added
-GET greeting
-[ERROR]: No key for: greeting, false
 ```
 
 `SET` values are single tokens, so they cannot contain spaces.
 
 ## Implementation notes
 
-The store lives in [internal/kvstore/KV.go](./internal/kvstore/KV.go). Each hash-table bucket is a slice of entries; entries with the same bucket index are compared by key. The server in [cmd/KVStore/main.go](./cmd/KVStore/main.go) starts a goroutine for every client connection, while [internal/commands/parse_command.go](./internal/commands/parse_command.go) translates protocol commands into store operations.
+The store lives in [pkg/kvstore/KV.go](./pkg/kvstore/KV.go). Each hash-table bucket is a slice of entries; entries with the same bucket index are compared by key. The server in [pkg/server/server.go](./pkg/server/server.go) handles client connections, while [pkg/commands/parse_command.go](./pkg/commands/parse_command.go) reads RESP and translates commands into store operations.
 
 ## Test
 
@@ -80,7 +75,7 @@ go test ./...
 [x] INCR
 [x] STRLEN
 
-[ ] RESP             ← NEXT
+[x] RESP
 [ ] CLI
 [ ] Pipelining
 [ ] TTL + expiry heap
