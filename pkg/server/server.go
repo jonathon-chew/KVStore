@@ -42,6 +42,27 @@ func handleConnection(conn net.Conn, kv *kvstore.HashTable) {
 	}
 }
 
+func SendRequest(resp string) (string, error) {
+	conn, err := net.Dial("tcp", "localhost:6379")
+	if err != nil {
+		return "", fmt.Errorf("[ERROR]: issue making TCP Connection %s", err.Error())
+	}
+	defer conn.Close()
+
+	_, err = conn.Write([]byte(resp))
+	if err != nil {
+		return "", fmt.Errorf("[ERROR]: issue writing TCP Connection %s", err.Error())
+	}
+
+	reader := bufio.NewReader(conn)
+	tcp_resp, err := reader.ReadString('\n')
+	if err != nil {
+		return "", fmt.Errorf("[ERROR]: reading from TCP response %s", err.Error())
+	}
+
+	return tcp_resp, nil
+}
+
 func Server() {
 
 	fmt.Println("Up and running...")
