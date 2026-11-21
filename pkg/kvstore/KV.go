@@ -107,7 +107,6 @@ func NewKVStore(size int) *HashTable {
 	var kv HashTable
 
 	kv.Buckets = make([][]Entry, size)
-	kv.Size = size
 
 	return &kv
 }
