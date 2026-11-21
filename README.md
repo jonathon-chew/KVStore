@@ -62,6 +62,8 @@ The store lives in [pkg/kvstore/KV.go](./pkg/kvstore/KV.go). Each hash-table buc
 go test ./...
 ```
 
+Tests cover the command parser, hash-table operations, and server behaviour. The implementation is split into reusable packages under `pkg/` with the runnable server in `cmd/KVStore/`.
+
 ## Roadmap
 [x] HashMap
 [x] Resize

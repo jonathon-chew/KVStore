@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"strings"
 	"testing"
 
 	"github.com/jonathon-chew/KVStore/pkg/kvstore"
@@ -11,8 +12,9 @@ import (
 
 func Test_ReadCommand(t *testing.T) {
 
-	var ioR io.Reader
-	ioR.Read([]byte("*3"))
+	// TEXT: "*3\r\n$3\r\nSET\r\n$8\r\ngreeting\r\n$5\r\nHello\r\n"
+	ioR := strings.NewReader("*3\r\n$3\r\nSET\r\n$8\r\ngreeting\r\n$5\r\nHello\r\n")
+
 	buf := bufio.NewReader(ioR)
 
 	for {
@@ -33,7 +35,7 @@ func Test_ParseCommand(t *testing.T) {
 
 	// SET
 	kv_set := kvstore.NewKVStore(1)
-	set_response, err := ParseCommand("SET", []string{"Set_Test"}, kv_set)
+	set_response, err := ParseCommand("SET", []string{"Set_Test", "example"}, kv_set)
 	if err != nil {
 		t.Error(err)
 	}
@@ -71,7 +73,7 @@ func Test_ParseCommand(t *testing.T) {
 	// INCRBY
 	kv_incby := kvstore.NewKVStore(1)
 	// Init to 1
-	_, incby_err := ParseCommand("INCR", []string{"counter"}, kv_incby)
+	_, incby_err := ParseCommand("INCRBY", []string{"counter"}, kv_incby)
 	if incby_err != nil {
 		t.Error(incby_err)
 	}
@@ -82,12 +84,12 @@ func Test_ParseCommand(t *testing.T) {
 		t.Error(incby_err_2)
 	}
 
-	value, ok := kv_inc.Get("counter")
+	value, ok := kv_incby.Get("counter")
 	if !ok {
 		t.Error("[ERROR]: counter should have been initialised but wasn't")
 	}
 
-	if value != 5 {
+	if value != 4 {
 		t.Errorf("[ERROR]: Counter should be 5, initalised to 1 and incrimented by 4, it was actually %v", value)
 	}
 
