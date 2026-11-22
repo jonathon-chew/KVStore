@@ -4,16 +4,25 @@ import (
 	"fmt"
 	"hash/fnv"
 	"sync"
+	"time"
 )
 
-type Entry struct {
-	Key   string
-	Value any
+type Store interface {
+	Add(key string, value any) error
+	Get(key string) (any, bool)
+	Remove(key string) error
+	Update(key string, value any) error
 }
 
-type HashTable struct {
-	Buckets [][]Entry
-	Size    int // How many elements in a single bucket before resizing, to keep the arrays short for faster look up
+type entry struct {
+	key       string
+	value     any
+	expiresAt time.Time
+}
+
+type hashTable struct {
+	buckets [][]entry
+	size    int // How many elements in a single bucket before resizing, to keep the arrays short for faster look up
 	mu      sync.RWMutex
 }
 
@@ -23,17 +32,17 @@ func hashString(key string) uint32 {
 	return h.Sum32()
 }
 
-func (m *HashTable) bucketFor(key string) uint32 {
+func (m *hashTable) bucketFor(key string) uint32 {
 	hash := hashString(key)
-	return hash % uint32(len(m.Buckets))
+	return hash % uint32(len(m.buckets))
 }
 
-func (m *HashTable) exists(key string) (uint32, bool) {
+func (m *hashTable) exists(key string) (uint32, bool) {
 	bucket_number := m.bucketFor(key)
-	bucket := m.Buckets[bucket_number]
+	bucket := m.buckets[bucket_number]
 
 	for _, value := range bucket {
-		if value.Key == key {
+		if value.key == key {
 			return bucket_number, true
 		}
 	}
@@ -41,9 +50,9 @@ func (m *HashTable) exists(key string) (uint32, bool) {
 	return bucket_number, false
 }
 
-func (m *HashTable) resize() {
-	oldBuckets := m.Buckets
-	m.Buckets = make([][]Entry, len(m.Buckets)*2)
+func (m *hashTable) resize() {
+	oldBuckets := m.buckets
+	m.buckets = make([][]entry, len(m.buckets)*2)
 
 	for _, bucket_content := range oldBuckets {
 		if len(bucket_content) == 0 {
@@ -51,10 +60,10 @@ func (m *HashTable) resize() {
 		}
 
 		for _, entry := range bucket_content {
-			bucketNumber := m.bucketFor(entry.Key)
+			bucketNumber := m.bucketFor(entry.key)
 
-			m.Buckets[bucketNumber] = append(
-				m.Buckets[bucketNumber],
+			m.buckets[bucketNumber] = append(
+				m.buckets[bucketNumber],
 				entry,
 			)
 		}
@@ -62,7 +71,7 @@ func (m *HashTable) resize() {
 
 }
 
-func (m *HashTable) Add(key string, value any) error {
+func (m *hashTable) Add(key string, value any) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	bucket_number, exists := m.exists(key)
@@ -70,48 +79,60 @@ func (m *HashTable) Add(key string, value any) error {
 		return fmt.Errorf("%s already exists", key)
 	}
 
-	bucket := m.Buckets[bucket_number]
-	bucket = append(bucket, Entry{
-		Key:   key,
-		Value: value,
+	bucket := m.buckets[bucket_number]
+	bucket = append(bucket, entry{
+		key:   key,
+		value: value,
 	})
 
-	m.Buckets[bucket_number] = bucket
-	m.Size++
+	m.buckets[bucket_number] = bucket
+	m.size++
 
-	if float64(m.Size)/float64(len(m.Buckets)) >= 0.75 {
+	if float64(m.size)/float64(len(m.buckets)) >= 0.75 {
 		m.resize()
 	}
 
 	return nil
 }
 
-func (m *HashTable) Get(key string) (any, bool) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+func (m *hashTable) Get(key string) (any, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
 	bucket_number := m.bucketFor(key)
-	bucket := m.Buckets[bucket_number]
+	bucket := m.buckets[bucket_number]
 
 	for _, value := range bucket {
-		if value.Key == key {
-			return value.Value, true
+		if value.key == key {
+			return value.value, true
 		}
 	}
 
 	return nil, false
 }
 
-func NewKVStore(size int) *HashTable {
+func (m *hashTable) Exists(key string) bool {
+	if _, exists := m.Get(key); !exists {
+		return false
+	}
 
-	var kv HashTable
+	return true
+}
 
-	kv.Buckets = make([][]Entry, size)
+func NewKVStore(size int) Store {
+
+	var kv hashTable
+
+	if size < 1 {
+		size = 1
+	}
+
+	kv.buckets = make([][]entry, size)
 
 	return &kv
 }
 
-func (m *HashTable) Remove(key string) error {
+func (m *hashTable) Remove(key string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -120,46 +141,51 @@ func (m *HashTable) Remove(key string) error {
 		return fmt.Errorf("%s does not exist", key)
 	}
 
-	bucket := m.Buckets[bucket_number]
+	bucket := m.buckets[bucket_number]
 
 	for idx, value := range bucket {
-		if value.Key == key {
+		if value.key == key {
 			bucket = append(bucket[:idx], bucket[idx+1:]...)
-			m.Buckets[bucket_number] = bucket
+			m.buckets[bucket_number] = bucket
+			m.size--
 			return nil
 		}
 	}
 
-	m.Size--
-
 	return nil
 }
 
-func (m *HashTable) Update(key string, value any) error {
+func (m *hashTable) TTL(key string) {
+
+}
+
+func (m *hashTable) Update(key string, value any) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 
 	buckerNumber, exists := m.exists(key)
 	if !exists {
+		m.mu.Unlock()
 		m.Add(key, value)
 		return nil
 	}
 
-	bucket := m.Buckets[buckerNumber]
+	defer m.mu.Unlock()
+
+	bucket := m.buckets[buckerNumber]
 
 	for idx, value := range bucket {
-		if value.Key == key {
+		if value.key == key {
 			bucket = append(bucket[:idx], bucket[idx+1:]...)
-			m.Buckets[buckerNumber] = bucket
+			m.buckets[buckerNumber] = bucket
 		}
 	}
 
-	bucket = append(bucket, Entry{
-		Key:   key,
-		Value: value,
+	bucket = append(bucket, entry{
+		key:   key,
+		value: value,
 	})
 
-	m.Buckets[buckerNumber] = bucket
+	m.buckets[buckerNumber] = bucket
 
 	return nil
 }

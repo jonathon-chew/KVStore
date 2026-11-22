@@ -1,9 +1,11 @@
 package main
 
 import (
+	"os"
+
 	"github.com/jonathon-chew/KVStore/pkg/server"
 )
 
 func main() {
-	server.Server()
+	os.Exit(server.Server(""))
 }
