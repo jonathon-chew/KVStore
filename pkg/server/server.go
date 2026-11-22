@@ -5,12 +5,14 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"strconv"
+	"strings"
 
 	"github.com/jonathon-chew/KVStore/pkg/commands"
 	"github.com/jonathon-chew/KVStore/pkg/kvstore"
 )
 
-func handleConnection(conn net.Conn, kv *kvstore.HashTable) {
+func handleConnection(conn net.Conn, kv kvstore.Store) {
 	defer conn.Close()
 
 	fmt.Println("Client connected:", conn.RemoteAddr())
@@ -42,8 +44,14 @@ func handleConnection(conn net.Conn, kv *kvstore.HashTable) {
 	}
 }
 
-func SendRequest(resp string) (string, error) {
-	conn, err := net.Dial("tcp", "localhost:6379")
+func SendRequest(resp, port string) (string, error) {
+
+	cleanPort, err := resolvePort(port)
+	if err != nil {
+		return "", err
+	}
+
+	conn, err := net.Dial("tcp", "localhost"+cleanPort)
 	if err != nil {
 		return "", fmt.Errorf("[ERROR]: issue making TCP Connection %s", err.Error())
 	}
@@ -63,13 +71,57 @@ func SendRequest(resp string) (string, error) {
 	return tcp_resp, nil
 }
 
-func Server() {
+func resolvePort(port string) (string, error) {
+	var cleanPort string
+	if port == "" || port == "*" {
+		cleanPort = ":6379"
+	}
+
+	if !strings.Contains(port, ":") && cleanPort == "" {
+		check_port := port
+		_, err := strconv.Atoi(check_port)
+		if err != nil {
+			// fmt.Printf("[ERROR]: %s\n", err.Error())
+			return "", fmt.Errorf("[ERROR]: %s\n", err.Error())
+		}
+
+		cleanPort = ":" + port
+	}
+
+	if strings.Contains(port, ":") && cleanPort == "" {
+		if len(port) > 1 {
+			check_port := port[1:]
+			_, err := strconv.Atoi(check_port)
+			if err != nil {
+				// fmt.Printf("[ERROR]: %s\n", err.Error())
+				return "", fmt.Errorf("[ERROR]: %s\n", err.Error())
+			}
+		}
+
+		cleanPort = port
+	}
+
+	return cleanPort, nil
+}
+
+/*
+This starts a KVStore TCP server on the port passed in
+Port is expected to have ":" in it
+Requires the port number to continue
+if "" or * is passed in then the default port will be used ":6379"
+*/
+func Server(port string) int {
 
 	fmt.Println("Up and running...")
-
 	kv := kvstore.NewKVStore(10)
 
-	listener, err := net.Listen("tcp", ":6379")
+	cleanPort, err := resolvePort(port)
+	if err != nil {
+		fmt.Print(err.Error())
+		return 1
+	}
+
+	listener, err := net.Listen("tcp", cleanPort)
 	if err != nil {
 		fmt.Printf("[ERROR]: %s\n", err.Error())
 	}
@@ -78,6 +130,7 @@ func Server() {
 		conn, err := listener.Accept()
 		if err != nil {
 			fmt.Printf("[ERROR]: %s\n", err.Error())
+			return 1
 		}
 
 		go handleConnection(conn, kv)
