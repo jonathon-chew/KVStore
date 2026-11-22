@@ -19,8 +19,8 @@ func Test_AddKey(t *testing.T) {
 		{key: "Example", value: "Hello World", shouldWork: false},
 	}
 
-	var KVStore HashTable
-	KVStore.Buckets = make([][]Entry, 100)
+	var KVStore hashTable
+	KVStore.buckets = make([][]entry, 100)
 
 	for _, test := range tests {
 		err := KVStore.Add(test.key, test.value)
@@ -37,9 +37,11 @@ func Test_AddKey(t *testing.T) {
 }
 
 func Test_MainFunctionality(t *testing.T) {
-	var KVStore HashTable
+	// var KVStore hashTable
 
-	KVStore.Buckets = make([][]Entry, 10)
+	// KVStore.buckets = make([][]entry, 10)
+
+	KVStore := NewKVStore(10)
 
 	key := "Example"
 	value := "Hello World"
@@ -54,7 +56,7 @@ func Test_MainFunctionality(t *testing.T) {
 		return
 	}
 
-	_, exists := KVStore.exists(key)
+	_, exists := KVStore.Get(key)
 
 	if exists && found {
 		t.Logf("Key was added and exists and can be found with the exist method")
@@ -62,10 +64,13 @@ func Test_MainFunctionality(t *testing.T) {
 		t.Errorf("Key should have been added however it can't be found with the exist method")
 	}
 
-	KVStore.Remove(key)
+	err := KVStore.Remove(key)
+	if err != nil {
+		t.Error(err)
+	}
 
 	// Should no longer exist after being removed
-	_, exists = KVStore.exists(key)
+	_, exists = KVStore.Get(key)
 	if exists {
 		t.Errorf("%s exists: %v\n", key, exists)
 	} else {
@@ -75,7 +80,10 @@ func Test_MainFunctionality(t *testing.T) {
 
 func Test_Resize(t *testing.T) {
 	// 	Create a KVStore with 10 buckets.
-	kvstore := NewKVStore(10)
+	kvstore := hashTable{
+		buckets: make([][]entry, 10),
+		size:    0,
+	}
 
 	// Insert 8 unique keys.
 	for i := range 8 {
@@ -84,8 +92,8 @@ func Test_Resize(t *testing.T) {
 	}
 
 	// Verify the bucket count has doubled.
-	if len(kvstore.Buckets) != 20 {
-		t.Fatalf("[ERROR]: Size is: %d not 20", len(kvstore.Buckets))
+	if len(kvstore.buckets) != 20 {
+		t.Fatalf("[ERROR]: Size is: %d not 20", len(kvstore.buckets))
 	}
 
 	// Retrieve all 8 keys.
@@ -106,7 +114,7 @@ func Test_Resize(t *testing.T) {
 }
 
 func findCollisions(binSize uint32, number_of_words int) ([]string, error) {
-	content, err := os.ReadFile("/usr/share/dict/words")
+	content, err := os.ReadFile("./testdata/data.md")
 	if err != nil {
 		log.Printf("[ERROR]: Issues getting word list: %s", err.Error())
 		return []string{}, err
@@ -194,15 +202,91 @@ func Test_Collisions(t *testing.T) {
 
 func Test_Collision_Removal(t *testing.T) {}
 
-func Test_Update(t *testing.T) {}
+func Test_Update(t *testing.T) {
+	kv := NewKVStore(10)
 
-func Test_Remove(t *testing.T) {}
+	tests := map[string]struct {
+		key         string
+		value       string
+		should_fail bool
+	}{
+		"Exists": {
+			key:         "Hello",
+			value:       "World",
+			should_fail: false,
+		},
+		"Doesn't Exist": {
+			key:         "",
+			value:       "HELLO",
+			should_fail: true,
+		},
+	}
+
+	for test_name, test := range tests {
+
+		if test.key != "" {
+			kv.Add(test.key, test.value)
+			_, exists := kv.Get(test.key)
+			if !exists {
+				t.Fatalf("[ERROR]: Failed to add the initial key on test %s\n", test_name)
+			}
+		}
+		err := kv.Update(test.key, reverse(test.value))
+		if err != nil && test.should_fail == false {
+			t.Fatalf("[ERROR]: Error when trying to update the initial key on test %s\n", test_name)
+		}
+		resp, exists := kv.Get(test.key)
+		if !exists && test.should_fail == false {
+			t.Fatalf("[ERROR]: Failed get the updated key on test %s\n", test_name)
+		}
+		if resp != reverse(test.value) && test.should_fail == false {
+			t.Fatalf("[ERROR]: Failed to update the initial key on test %s\n", test_name)
+		}
+	}
+}
+
+func Test_Remove(t *testing.T) {
+
+	kv := hashTable{
+		buckets: make([][]entry, 10),
+		size:    0,
+	}
+
+	tests := map[string]struct {
+		key         string
+		value       string
+		should_fail bool
+	}{
+		"Exists":        {key: "Hello", value: "World", should_fail: false},
+		"Doesn't Exist": {key: "ifosifdos", value: "World", should_fail: true},
+	}
+
+	for test_name, test := range tests {
+		if err := kv.Add(test.key, test.value); err != nil && !test.should_fail {
+			t.Fatalf("[ERROR] Failed test: %s,  %s", test_name, err)
+		}
+
+		if _, check := kv.exists(test.key); !check && !test.should_fail {
+			t.Fatalf("[ERROR] Failed test: %s, as the key doesn't exist", test_name)
+		}
+
+		if err := kv.Remove(test.key); err != nil && !test.should_fail {
+			t.Fatalf("[ERROR] Failed test: %s, key could not be removed", test_name)
+		}
+
+		if _, check := kv.exists(test.key); check && !test.should_fail {
+			t.Fatalf("[ERROR] Failed test: %s, as the key exists after removal", test_name)
+		}
+
+	}
+
+}
 
 func Test_Resize_With_Collisions(t *testing.T) {}
 
 func Test_Concurrent_Operations(t *testing.T) {}
 
-func Fuzz_Differential(t *testing.F) {}
+// func Fuzz_Differential(t *testing.F) {}
 
 func FuzzAdding(f *testing.F) {
 	f.Add("Hello", "greioi")

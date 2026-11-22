@@ -97,7 +97,7 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 	}, nil
 }
 
-func ParseCommand(command string, args []string, kv *kvstore.HashTable) (any, error) {
+func ParseCommand(command string, args []string, kv kvstore.Store) (any, error) {
 
 	var key, value string
 
