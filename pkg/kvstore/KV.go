@@ -53,6 +53,28 @@ func (m *hashTable) exists(key string) (uint32, bool) {
 	return bucket_number, false
 }
 
+// remove deletes key from the store without acquiring the mutex.
+func (m *hashTable) remove(key string) error {
+	bucket_number, exists := m.exists(key)
+	if !exists {
+		return fmt.Errorf("%s does not exist", key)
+	}
+
+	bucket := m.buckets[bucket_number]
+
+	for idx, value := range bucket {
+		if value.key == key {
+			bucket = append(bucket[:idx], bucket[idx+1:]...)
+			m.buckets[bucket_number] = bucket
+			m.size--
+			return nil
+		}
+	}
+
+	return nil
+}
+
+// resize doubles the bucket count and rehashes all entries.
 func (m *hashTable) resize() {
 	oldBuckets := m.buckets
 	m.buckets = make([][]entry, len(m.buckets)*2)
@@ -139,33 +161,32 @@ func NewKVStore(size int) Store {
 	return &kv
 }
 
+// Remove deletes key from the store.
 func (m *hashTable) Remove(key string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	bucket_number, exists := m.exists(key)
-	if !exists {
-		return fmt.Errorf("%s does not exist", key)
-	}
+	return m.remove(key)
+}
 
-	bucket := m.buckets[bucket_number]
+// TTL returns the time-to-live information for key.
+func (m *hashTable) TTL(key string) int64 {
+	m.mu.RLocker()
+	defer m.mu.RUnlock()
 
-	for idx, value := range bucket {
-		if value.key == key {
-			bucket = append(bucket[:idx], bucket[idx+1:]...)
-			m.buckets[bucket_number] = bucket
-			m.size--
-			return nil
+	buckernumber := m.bucketFor(key)
+	bucket := m.buckets[buckernumber]
+
+	for idx, entry := range bucket {
+		if idx == int(buckernumber) {
+			return entry.expiresAt.UTC().Unix()
 		}
 	}
 
-	return nil
+	return 0
 }
 
-func (m *hashTable) TTL(key string) {
-
-}
-
+// Update replaces the value stored under key, or adds key if it is absent.
 func (m *hashTable) Update(key string, value any) error {
 	m.mu.Lock()
 
