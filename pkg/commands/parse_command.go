@@ -47,7 +47,7 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 
 	parts := make([]string, count)
 
-	for i := 0; i < count; i++ {
+	for i := range count {
 		prefix, err := reader.ReadByte()
 		if err != nil {
 			return Command{}, err

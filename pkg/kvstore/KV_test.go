@@ -122,7 +122,7 @@ func findCollisions(binSize uint32, number_of_words int) ([]string, error) {
 
 	var all_1s uint32 = 1
 	var return_words []string
-	for _, word := range strings.Split(string(content), "\n") {
+	for word := range strings.SplitSeq(string(content), "\n") {
 		insert_word := strings.TrimSpace(word)
 		bucket_number := hashString(insert_word) % binSize
 
