@@ -14,6 +14,7 @@ type CommandBuilder struct {
 	port    string
 }
 
+// CLI parses command-line arguments and sends the requested command.
 func CLI(arguments []string) {
 
 	var cb CommandBuilder

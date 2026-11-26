@@ -15,13 +15,12 @@ type Command struct {
 	Args []string
 }
 
-/*
-Check the length of the string is at least the length of the number put in
-*/
+// check_len_min reports whether check has at least minimum_length characters.
 func check_len_min(check string, minimum_length int) bool {
 	return len(check) >= minimum_length
 }
 
+// ReadCommand reads one RESP array command from reader.
 func ReadCommand(reader *bufio.Reader) (Command, error) {
 	prefix, err := reader.ReadByte()
 	if err != nil {
@@ -97,6 +96,7 @@ func ReadCommand(reader *bufio.Reader) (Command, error) {
 	}, nil
 }
 
+// ParseCommand executes a command against the supplied key-value store.
 func ParseCommand(command string, args []string, kv kvstore.Store) (any, error) {
 
 	var key, value string

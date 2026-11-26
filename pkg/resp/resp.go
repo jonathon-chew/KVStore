@@ -7,6 +7,7 @@ import (
 
 // ioR := strings.NewReader("*3\r\n$3\r\nSET\r\n$8\r\ngreeting\r\n$5\r\nHello\r\n")
 
+// MakeResp builds a RESP command containing command, key, and optionally value.
 func MakeResp(command, key, value string) (string, error) {
 
 	var sb strings.Builder

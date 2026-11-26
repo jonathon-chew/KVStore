@@ -26,17 +26,20 @@ type hashTable struct {
 	mu      sync.RWMutex
 }
 
+// hashString returns the FNV-1a hash for key.
 func hashString(key string) uint32 {
 	h := fnv.New32a()
 	h.Write([]byte(key))
 	return h.Sum32()
 }
 
+// bucketFor returns the bucket index for key.
 func (m *hashTable) bucketFor(key string) uint32 {
 	hash := hashString(key)
 	return hash % uint32(len(m.buckets))
 }
 
+// exists reports whether key is present and returns its bucket index.
 func (m *hashTable) exists(key string) (uint32, bool) {
 	bucket_number := m.bucketFor(key)
 	bucket := m.buckets[bucket_number]
@@ -71,6 +74,7 @@ func (m *hashTable) resize() {
 
 }
 
+// Add inserts value under key and returns an error if key already exists.
 func (m *hashTable) Add(key string, value any) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -95,6 +99,7 @@ func (m *hashTable) Add(key string, value any) error {
 	return nil
 }
 
+// Get returns the value stored under key and whether the key exists.
 func (m *hashTable) Get(key string) (any, bool) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -111,6 +116,7 @@ func (m *hashTable) Get(key string) (any, bool) {
 	return nil, false
 }
 
+// Exists reports whether key is present in the store.
 func (m *hashTable) Exists(key string) bool {
 	if _, exists := m.Get(key); !exists {
 		return false
@@ -119,6 +125,7 @@ func (m *hashTable) Exists(key string) bool {
 	return true
 }
 
+// NewKVStore creates a key-value store with the requested initial bucket count.
 func NewKVStore(size int) Store {
 
 	var kv hashTable
